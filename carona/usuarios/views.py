@@ -1,60 +1,42 @@
+# usuarios/views.py
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout
-from django.contrib import messages
-from django.contrib.auth.forms import AuthenticationForm
-from .forms import RegistroForm
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from .models import Usuario
+from .forms import CadastroForm, LoginForm, PerfilForm
 
-
-def pagina_inicial(request):
-    return render(request, 'paginainicial.html')
-
-def cadastra_usuario(request):
-    return render(request, 'cadastraUsuario.html')
-
-# -----------------------------
-# VIEW DE REGISTRO
-# -----------------------------
-def register_view(request):
+def cadastro(request):
     if request.method == 'POST':
-        form = RegistroForm(request.POST)
+        form = CadastroForm(request.POST)
         if form.is_valid():
-            user = form.save()  # salva usuário com senha em hash
-            login(request, user)  # loga automaticamente
-            messages.success(request, 'Cadastro realizado com sucesso!')
-            return redirect('home')
-        else:
-            messages.error(request, 'Erro no cadastro. Verifique os dados.')
+            form.save()
+            return redirect('login')
     else:
-        form = RegistroForm()  # GET: form vazio
+        form = CadastroForm()
+    return render(request, 'usuarios/cadastro.html', {'form': form})
 
-    # Renderiza o template sempre (GET ou POST inválido)
-    return render(request, 'usuarios/register.html', {'form': form})
-
-
-# -----------------------------
-# VIEW DE LOGIN
-# -----------------------------
-def login_view(request):
+def login(request):
     if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
+        form = LoginForm(request.POST)
         if form.is_valid():
-            user = form.get_user()
-            login(request, user)  # loga o usuário
-            messages.success(request, 'Login realizado com sucesso!')
-            return redirect('home')
-        else:
-            messages.error(request, 'Email ou senha inválidos.')
+            usuario = authenticate(email=form.cleaned_data['email'], password=form.cleaned_data['senha'])
+            if usuario:
+                auth_login(request, usuario)
+                return redirect('perfil')
     else:
-        form = AuthenticationForm()  # GET: form vazio
-
-    # Renderiza o template sempre (GET ou POST inválido)
+        form = LoginForm()
     return render(request, 'usuarios/login.html', {'form': form})
 
+def perfil(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    if request.method == 'POST':
+        form = PerfilForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+    else:
+        form = PerfilForm(instance=request.user)
+    return render(request, 'usuarios/perfil.html', {'form': form})
 
-# -----------------------------
-# VIEW DE LOGOUT
-# -----------------------------
-def logout_view(request):
-    logout(request)  # encerra sessão do usuário
-    messages.success(request, 'Logout realizado com sucesso!')
+def logout(request):
+    auth_logout(request)
     return redirect('login')
